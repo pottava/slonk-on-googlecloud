@@ -90,13 +90,13 @@ export CLUSTER_NAME=
 クラスタの接続形式をよりセキュアなものに変更（DNS エンドポイントを有効化）します。
 
 ```bash
-gcloud container clusters update "${CLUSTER_NAME}" --region "asia-northeast1" --enable-dns-access --no-enable-private-endpoint --no-enable-master-authorized-networks
+gcloud container clusters update "${CLUSTER_NAME}" --region "asia-southeast1" --enable-dns-access --no-enable-private-endpoint --no-enable-master-authorized-networks
 ```
 
 イメージ ストリーミングも有効化しておきましょう。
 
 ```bash
-gcloud container clusters update "${CLUSTER_NAME}" --region "asia-northeast1" --enable-image-streaming
+gcloud container clusters update "${CLUSTER_NAME}" --region "asia-southeast1" --enable-image-streaming
 ```
 
 ### 3.3. kubectl 構成情報の更新
@@ -106,7 +106,7 @@ gcloud container clusters update "${CLUSTER_NAME}" --region "asia-northeast1" --
 https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl#install_plugin
 
 ```bash
-gcloud container clusters get-credentials "${CLUSTER_NAME}" --location asia-northeast1 --dns-endpoint
+gcloud container clusters get-credentials "${CLUSTER_NAME}" --location "asia-southeast1" --dns-endpoint
 kubectl cluster-info
 ```
 
@@ -134,27 +134,85 @@ kubectl logs "job/$( kubectl get jobs | grep '^shared-fs-job-' | awk '{print $1}
 
 ## 4. Slinky のインストール
 
-### 4.1. インストール
+### 4.1. Slurm Operator インストール
 
 Helm がなければ、先に [Helm をインストール](https://helm.sh/ja/docs/intro/install/) します。
 
-その上で https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/docs/quickstart.md に沿ってインストールしましょう。
+その上で [公式の手順](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/docs/quickstart.md) に沿って `Slurm Operator` までをインストールしましょう。
 
-### 4.2. Slurm クラスタの設定変更
+### 4.2. Slurm クラスタのインストール
 
-作業ディレクトリ直下に作られた values-slurm.yaml を編集し、ログインノードを有効化しましょう。  
-以下の設定値を変更します。
+設定テンプレートをダウンロードし、
+
+```bash
+curl -L https://raw.githubusercontent.com/SlinkyProject/slurm-operator/refs/tags/v0.3.0/helm/slurm/values.yaml -o values-slurm.yaml
+```
+
+values-slurm.yaml を編集します。
+
+- [L.21](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/helm/slurm/values.yaml#L21) nameOverride に GKE クラスタの名前を入れます
+
+ログインノードを有効化し
 
 - [L.310](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/helm/slurm/values.yaml#L310) enabled を true に変更
 - [L.350](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/helm/slurm/values.yaml#L350-L351) rootSshAuthorizedKeys にあなたの公開鍵を指定
 
-合わせて、NVIDIA の Slurm プラグイン、Pyxis を使えるようにしましょう。  
+NVIDIA の Slurm プラグイン、Pyxis を使えるようにしておきましょう。  
 [こちら](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/docs/pyxis.md#configure)に沿って設定ファイルを変更します。
 
-その上で、環境へ反映します。
+そして GPU ノードが Slurm のパーティションとして認識されるよう、以下の設定を `nodesets:` の一つとして [L.487](https://github.com/SlinkyProject/slurm-operator/blob/v0.3.0/helm/slurm/values.yaml#L486) あたりに追加します。
+
+```yaml
+# l4 ノードプール用の NodeSet
+- name: "l4"
+  enabled: true
+  # GPU に合わせたコンテナイメージを指定
+  image:
+    repository: "nvcr.io/nvidia/cuda"
+    tag: "12.9.1-cudnn-runtime-ubuntu22.04"
+  # GKE ノードのラベルに合致させる
+  nodeSelector:
+    cloud.google.com/gke-nodepool: "l4"
+  # GPU ノードの Taint を許容する
+  tolerations:
+    - key: "nvidia.com/gpu"
+      value: "present"
+      operator: "Exists"
+      effect: "NoSchedule"
+  # コンテナが要求するリソース
+  resources:
+    limits:
+      nvidia.com/gpu: "1"
+  # マウントオプション
+  volumeClaimTemplates: []
+  extraVolumeMounts:
+    - name: training-data
+      mountPath: /training-data
+    - name: shared
+      mountPath: /shared
+  extraVolumes:
+    - name: training-data
+      persistentVolumeClaim:
+        claimName: slurm-training-pvc
+    - name: shared
+      persistentVolumeClaim:
+        claimName: filestore-pvc
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  useResourceLimits: true
+  partition:
+    enabled: true
+    config:
+      Default: "NO"
+      State: "UP"
+      MaxTime: "UNLIMITED"
+```
+
+設定を環境へ反映します。
 
 ```bash
-helm upgrade slurm oci://ghcr.io/slinkyproject/charts/slurm --version=0.3.0 --namespace=slurm --values=values-slurm.yaml
+helm install slurm oci://ghcr.io/slinkyproject/charts/slurm --version=0.3.0 --namespace=slurm --create-namespace --values=values-slurm.yaml
 ```
 
 `slurm-login-xxx` Pod が起動するのを待ちましょう。
@@ -192,8 +250,14 @@ Slurm の挙動を確認してみます。
 
 ```bash
 sinfo
-srun --partition=debug grep PRETTY /etc/os-release
-srun --partition=debug --container-image=alpine:latest grep PRETTY /etc/os-release
+srun grep PRETTY /etc/os-release
+srun --container-image=alpine:latest grep PRETTY /etc/os-release
+```
+
+実際に GPU が利用できるか、または実際の計算が投入できるかなどを試してみてください。
+
+```bash
+srun --partition l4 --nodes 1 --gpus 1 nvidia-smi
 ```
 
 ## 5. 環境のシャットダウン

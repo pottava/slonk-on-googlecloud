@@ -3,8 +3,8 @@ blueprint_name: g2-<your-name>
 vars:
   project_id: ## Set GCP Project ID Here ##
   deployment_name: g2-<your-name>
-  region: asia-northeast1
-  zone: asia-northeast1-b # g2 machine has better availability in this zone
+  region: asia-southeast1
+  zone: asia-southeast1-a # g2 machine has better availability in this zone
   # Cidr block containing the IP of the machine calling terraform.
   # The following line must be updated for this example to work.
   authorized_cidr: <authorized_cidr>/32 # curl -s httpbin.org/ip | jq -r '.origin'
@@ -70,6 +70,9 @@ deployment_groups:
           configure_workload_identity_sa: true # needed when using GCS
           gcp_public_cidrs_access_enabled: $(vars.gcp_public_cidrs_access_enabled)
           enable_private_endpoint: false # Allows for access from authorized public IPs
+          cloud_dns_config:
+            cluster_dns: "CLOUD_DNS"
+            cluster_dns_scope: "CLUSTER_SCOPE"
           master_authorized_networks:
             - display_name: kubectl-access-network
               cidr_block: $(vars.authorized_cidr)
