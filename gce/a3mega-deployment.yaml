@@ -1,0 +1,21 @@
+terraform_backend_defaults:
+  type: gcs
+  configuration:
+    bucket: # customer-bucket
+
+vars:
+  deployment_name: a3mega-base
+  project_id: # customer-project
+  region: asia-northeast1
+  zone: asia-northeast1-b
+  network_name_system: a3mega-sys-net
+  subnetwork_name_system: a3mega-sys-subnet
+  enable_ops_agent: true
+  enable_nvidia_dcgm: true
+  enable_nvidia_persistenced: true
+  disk_size_gb: 200
+  final_image_family: slurm-a3mega
+  slurm_cluster_name: a3mega
+  a3mega_reservation_name: "" # supply reservation name
+  a3mega_maintenance_interval: ""
+  a3mega_cluster_size: 1

@@ -1,8 +1,8 @@
-blueprint_name: g2-<your-name>
+blueprint_name: g2-gke-<your-name>
 
 vars:
   project_id: ## Set GCP Project ID Here ##
-  deployment_name: g2-<your-name>
+  deployment_name: g2-gke-<your-name>
   region: asia-southeast1
   zone: asia-southeast1-a # g2 machine has better availability in this zone
   # Cidr block containing the IP of the machine calling terraform.
