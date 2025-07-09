@@ -116,10 +116,16 @@ sinfo
 srun -p debug df -h
 ```
 
+実際に GPU が利用できるか、または実際の計算が投入できるかなどを試してみてください。
+
+```bash
+srun -N 1 enroot import docker://nvcr.io#nvidia/pytorch:24.04-py3
+```
+
 ## 5. 環境のシャットダウン
 
 `blueprint_name` を指定して、環境を破棄します。
 
 ```bash
-./gcluster destroy <your_blueprint_name>
+./gcluster destroy <your_blueprint_name> --auto-approve
 ```

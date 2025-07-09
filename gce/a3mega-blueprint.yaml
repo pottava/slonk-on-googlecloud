@@ -22,7 +22,7 @@ deployment_groups:
         settings:
           network_name: $(vars.network_name_system)
           network_address_range: $(vars.sys_net_range)
-          mtu: 8244
+
           # using explicit var.subnetworks to allow for easier addition
           # of multiple system subnetworks in other regions
           subnetworks:
@@ -114,33 +114,33 @@ deployment_groups:
                 apt-get install -y git
                 ansible-galaxy role install googlecloudplatform.google_cloud_ops_agents
                 ansible-pull \
-                    -U https://github.com/GoogleCloudPlatform/slurm-gcp -C 6.10.4 \
+                    -U https://github.com/GoogleCloudPlatform/slurm-gcp -C 6.9.1 \
                     -i localhost, --limit localhost --connection=local \
                     -e @/var/tmp/slurm_vars.json \
                     ansible/playbook.yml
-            - type: ansible-local
-              destination: update-gvnic.yml
-              content: |
-                ---
-                - name: Install updated gVNIC driver from GitHub
-                  hosts: all
-                  become: true
-                  vars:
-                    package_url: https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/releases/download/v1.4.5/gve-dkms_1.4.5_all.deb
-                    package_filename: /tmp/{{ package_url | basename }}
-                  tasks:
-                  - name: Install driver dependencies
-                    ansible.builtin.apt:
-                      name:
-                      - dkms
-                  - name: Download gVNIC package
-                    ansible.builtin.get_url:
-                      url: "{{ package_url }}"
-                      dest: "{{ package_filename }}"
-                  - name: Install updated gVNIC
-                    ansible.builtin.apt:
-                      deb: "{{ package_filename }}"
-                      state: present
+            # - type: ansible-local
+            #   destination: update-gvnic.yml
+            #   content: |
+            #     ---
+            #     - name: Install updated gVNIC driver from GitHub
+            #       hosts: all
+            #       become: true
+            #       vars:
+            #         package_url: https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/releases/download/v1.4.3/gve-dkms_1.4.3_all.deb
+            #         package_filename: /tmp/{{ package_url | basename }}
+            #       tasks:
+            #       - name: Install driver dependencies
+            #         ansible.builtin.apt:
+            #           name:
+            #           - dkms
+            #       - name: Download gVNIC package
+            #         ansible.builtin.get_url:
+            #           url: "{{ package_url }}"
+            #           dest: "{{ package_filename }}"
+            #       - name: Install updated gVNIC
+            #         ansible.builtin.apt:
+            #           deb: "{{ package_filename }}"
+            #           state: present
             - type: shell
               destination: install-nvidia.sh
               content: |
@@ -361,7 +361,7 @@ deployment_groups:
           source_image_project_id: $(vars.source_image_project_id)
           image_family: $(vars.final_image_family)
           disk_size: $(vars.disk_size_gb)
-          omit_external_ip: false
+          omit_external_ip: true
 
   - group: cluster
     modules:
@@ -369,8 +369,8 @@ deployment_groups:
       - id: data-bucket
         source: community/modules/file-system/cloud-storage-bucket
         settings:
-          local_mount: /training-data
           name_prefix: training
+          local_mount: /gcs
           random_suffix: true
           force_destroy: false
           enable_hierarchical_namespace: true
@@ -394,7 +394,6 @@ deployment_groups:
         source: community/modules/network/private-service-access
         use:
           - sysnet
-
       - id: homefs
         source: modules/file-system/filestore
         use:
@@ -402,7 +401,6 @@ deployment_groups:
           - private_service_access
         settings:
           filestore_tier: BASIC_SSD
-          zone: $(vars.zone)
           size_gb: 2560
           local_mount: /home
           mount_options: "defaults,hard"
