@@ -118,29 +118,29 @@ deployment_groups:
                     -i localhost, --limit localhost --connection=local \
                     -e @/var/tmp/slurm_vars.json \
                     ansible/playbook.yml
-            # - type: ansible-local
-            #   destination: update-gvnic.yml
-            #   content: |
-            #     ---
-            #     - name: Install updated gVNIC driver from GitHub
-            #       hosts: all
-            #       become: true
-            #       vars:
-            #         package_url: https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/releases/download/v1.4.3/gve-dkms_1.4.3_all.deb
-            #         package_filename: /tmp/{{ package_url | basename }}
-            #       tasks:
-            #       - name: Install driver dependencies
-            #         ansible.builtin.apt:
-            #           name:
-            #           - dkms
-            #       - name: Download gVNIC package
-            #         ansible.builtin.get_url:
-            #           url: "{{ package_url }}"
-            #           dest: "{{ package_filename }}"
-            #       - name: Install updated gVNIC
-            #         ansible.builtin.apt:
-            #           deb: "{{ package_filename }}"
-            #           state: present
+            - type: ansible-local
+              destination: update-gvnic.yml
+              content: |
+                ---
+                - name: Install updated gVNIC driver from GitHub
+                  hosts: all
+                  become: true
+                  vars:
+                    package_url: https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/releases/download/v1.4.3/gve-dkms_1.4.3_all.deb
+                    package_filename: /tmp/{{ package_url | basename }}
+                  tasks:
+                  - name: Install driver dependencies
+                    ansible.builtin.apt:
+                      name:
+                      - dkms
+                  - name: Download gVNIC package
+                    ansible.builtin.get_url:
+                      url: "{{ package_url }}"
+                      dest: "{{ package_filename }}"
+                  - name: Install updated gVNIC
+                    ansible.builtin.apt:
+                      deb: "{{ package_filename }}"
+                      state: present
             - type: shell
               destination: install-nvidia.sh
               content: |
@@ -418,7 +418,7 @@ deployment_groups:
           node_count_dynamic_max: 2
           machine_type: n2-standard-2
           enable_public_ips: false
-          enable_shielded_vm: true
+          enable_shielded_vm: false
 
       - id: debug_partition
         source: community/modules/compute/schedmd-slurm-gcp-v6-partition
@@ -534,7 +534,7 @@ deployment_groups:
           disk_type: pd-ssd
           machine_type: a3-megagpu-8g
           enable_public_ips: false
-          enable_shielded_vm: true
+          enable_shielded_vm: false
           advanced_machine_features:
             threads_per_core: null # Use platform default value
           node_conf:
@@ -605,7 +605,7 @@ deployment_groups:
           name_prefix: login
           disk_type: pd-balanced
           machine_type: c2-standard-4
-          enable_shielded_vm: true
+          enable_shielded_vm: false
 
       - id: slurm_controller
         source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
@@ -633,4 +633,4 @@ deployment_groups:
               content: |
                 #!/bin/bash
                 hostname | tee /etc/hostname
-          enable_shielded_vm: true
+          enable_shielded_vm: false
